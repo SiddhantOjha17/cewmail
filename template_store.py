@@ -23,8 +23,12 @@ def sanitize_name(name: str) -> str:
     return name
 
 
+_ACRONYMS = {"po", "gst", "poc"}
+
+
 def pretty_name(name: str) -> str:
-    return name.replace("_", " ").strip().title()
+    words = name.replace("_", " ").strip().split()
+    return " ".join(w.upper() if w.lower() in _ACRONYMS else w.capitalize() for w in words)
 
 
 def list_categories() -> list[str]:

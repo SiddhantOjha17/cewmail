@@ -1,0 +1,24 @@
+Purpose: Send the first priced quotation to a new client for a specific plastic component or
+project, with the detailed pricing living in an attached formal costing PDF rather than typed
+out in the email body.
+
+Tone: Professional, precise, confidence-inspiring -- this is often the deciding moment for
+winning the business.
+
+Structure to follow:
+1. Thank them for sharing their requirement/drawing and for the opportunity to quote.
+2. Briefly confirm your understanding of what's being quoted (component, material, quantity)
+   using the specifics given in the context -- don't invent details that weren't given.
+3. State that a detailed formal costing/quotation (including GST) is attached as a PDF, and
+   that the email itself just summarizes the key commercial terms:
+   - Payment terms: 50% advance, balance 50% within 15 days of delivery.
+   - Quote validity: valid for 1 month from the date of the quotation.
+   - Delivery/lead time: use whatever is given in the context; otherwise a placeholder like
+     [production lead time] rather than inventing a number.
+4. Do not state specific prices or GST figures in the email body -- refer to "as per the
+   attached quotation" for exact numbers.
+5. Invite questions and state a clear next step (e.g. "let us know if you'd like to proceed
+   and we'll get started").
+
+Keep it clear and concise -- the pricing detail belongs in the attachment, the email is the
+cover note.

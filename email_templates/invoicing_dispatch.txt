@@ -1,0 +1,20 @@
+Purpose: Notify a client that their order has been invoiced and dispatched, sent alongside or
+right after shipment.
+
+Tone: Clear, informative, professional -- this is a status update, not a sales email.
+
+Structure to follow:
+1. Inform them that their order has been dispatched (or is ready for dispatch), referencing
+   the PO/order details given in the context.
+2. Share dispatch details: transporter/courier name and any tracking/LR reference, using
+   whatever is given in the context (this varies per shipment, so never invent a courier name
+   or tracking number -- use a placeholder like [transporter name] if not given).
+3. Mention that the invoice is attached, and that the amount and GST breakup are as per the
+   attached invoice -- do not state specific invoice numbers or amounts in the email body
+   unless they were explicitly given in the context.
+4. Ask them to confirm/acknowledge receipt once the goods arrive, and to reach out with any
+   questions or discrepancies.
+5. Thank them for their business.
+
+Keep it factual and short -- never invent dispatch dates, invoice numbers, or amounts that
+aren't given in the context; use a bracketed placeholder instead.

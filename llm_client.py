@@ -4,7 +4,7 @@ import json
 import logging
 import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, create_model
 
 import config
 
@@ -38,6 +38,16 @@ class DraftEmail(BaseModel):
 
 class DraftResponse(BaseModel):
     drafts: list[DraftEmail]
+
+
+def _make_strict_draft_schema(n: int) -> type[BaseModel]:
+    """A DraftResponse variant with a hard-enforced array length, passed to the API's own
+    structured-output mechanism so the model is actually constrained to produce exactly n
+    drafts at generation time, rather than just being asked nicely in the prompt."""
+    return create_model(
+        "DraftResponseStrict",
+        drafts=(list[DraftEmail], Field(min_length=n, max_length=n)),
+    )
 
 
 class LLMError(Exception):
@@ -88,8 +98,12 @@ def _build_tweak_prompt(subject: str, body: str, instruction: str) -> str:
 
 
 def _parse_fallback(raw_text: str, schema: type[BaseModel]) -> BaseModel:
+    """Parses with a schema that has no array-length constraints, so a technically-valid
+    but short response (e.g. 2 drafts instead of 3) still comes back usable instead of
+    being discarded for a synthetic error draft."""
+
     def _coerce(data):
-        if schema is DraftResponse and isinstance(data, list):
+        if isinstance(data, list) and "drafts" in schema.model_fields:
             data = {"drafts": data}
         return schema.model_validate(data)
 
@@ -108,12 +122,13 @@ def _parse_fallback(raw_text: str, schema: type[BaseModel]) -> BaseModel:
             pass
 
     logger.warning("Could not parse structured output from LLM; falling back to raw text.")
-    if schema is DraftResponse:
-        return DraftResponse(drafts=[DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")])
-    return DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")
+    fallback_draft = DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")
+    if "drafts" in schema.model_fields:
+        return schema(drafts=[fallback_draft])
+    return fallback_draft
 
 
-def _call_gemini(prompt: str, schema: type[BaseModel]) -> BaseModel:
+def _call_gemini(prompt: str, strict_schema: type[BaseModel], lenient_schema: type[BaseModel]) -> BaseModel:
     if not config.GEMINI_API_KEY:
         raise LLMError("Gemini not configured (no GEMINI_API_KEY)")
 
@@ -127,7 +142,7 @@ def _call_gemini(prompt: str, schema: type[BaseModel]) -> BaseModel:
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
-                "response_schema": schema,
+                "response_schema": strict_schema,
             },
         )
     except genai_errors.APIError as e:
@@ -136,12 +151,12 @@ def _call_gemini(prompt: str, schema: type[BaseModel]) -> BaseModel:
         raise LLMError(f"Gemini request failed: {e}") from e
 
     parsed = getattr(response, "parsed", None)
-    if isinstance(parsed, schema):
+    if isinstance(parsed, strict_schema):
         return parsed
-    return _parse_fallback(response.text or "", schema)
+    return _parse_fallback(response.text or "", lenient_schema)
 
 
-def _call_openai(prompt: str, schema: type[BaseModel]) -> BaseModel:
+def _call_openai(prompt: str, strict_schema: type[BaseModel], lenient_schema: type[BaseModel]) -> BaseModel:
     if not config.OPENAI_API_KEY:
         raise LLMError("OpenAI not configured (no OPENAI_API_KEY)")
 
@@ -152,7 +167,7 @@ def _call_openai(prompt: str, schema: type[BaseModel]) -> BaseModel:
         completion = client.chat.completions.parse(
             model=config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            response_format=schema,
+            response_format=strict_schema,
         )
     except OpenAIError as e:
         raise LLMError(f"OpenAI API error: {e}") from e
@@ -162,20 +177,30 @@ def _call_openai(prompt: str, schema: type[BaseModel]) -> BaseModel:
     message = completion.choices[0].message
     if message.parsed is not None:
         return message.parsed
-    return _parse_fallback(message.content or "", schema)
+    return _parse_fallback(message.content or "", lenient_schema)
 
 
-def _generate_structured(prompt: str, schema: type[BaseModel]) -> tuple[BaseModel, str]:
-    """Tries Gemini first, then OpenAI. Raises LLMError only if both fail/aren't configured."""
+def _generate_structured(
+    prompt: str,
+    strict_schema: type[BaseModel],
+    lenient_schema: type[BaseModel] | None = None,
+) -> tuple[BaseModel, str]:
+    """Tries Gemini first, then OpenAI. strict_schema is what's sent to the API's own
+    structured-output mechanism (steers generation, e.g. enforces exact array length);
+    lenient_schema (defaults to strict_schema) is used when manually parsing fallback
+    text, so an imperfect-but-usable response isn't discarded over a strict mismatch.
+    Raises LLMError only if both backends fail/aren't configured."""
+    lenient_schema = lenient_schema or strict_schema
+
     gemini_error: Exception | None = None
     try:
-        return _call_gemini(prompt, schema), "gemini"
+        return _call_gemini(prompt, strict_schema, lenient_schema), "gemini"
     except LLMError as e:
         gemini_error = e
         logger.warning("Gemini call failed, falling back to OpenAI: %s", e)
 
     try:
-        return _call_openai(prompt, schema), "openai"
+        return _call_openai(prompt, strict_schema, lenient_schema), "openai"
     except LLMError as e:
         logger.error("OpenAI fallback also failed: %s", e)
         raise gemini_error or e
@@ -189,7 +214,8 @@ def generate_drafts(
 ) -> tuple[list[dict], str]:
     """Returns (drafts, backend_used)."""
     prompt = _build_prompt(template, context, source_email, n)
-    result, backend = _generate_structured(prompt, DraftResponse)
+    strict_schema = _make_strict_draft_schema(n)
+    result, backend = _generate_structured(prompt, strict_schema, DraftResponse)
     return [d.model_dump() for d in result.drafts], backend
 
 

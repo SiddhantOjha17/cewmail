@@ -1,0 +1,18 @@
+Purpose: Acknowledge receipt of a client's Purchase Order (PO) and confirm the order details,
+kicking off production.
+
+Tone: Prompt, reassuring, professional -- this email builds the client's confidence that
+their order is in good hands.
+
+Structure to follow:
+1. Thank them for the PO / confirmed order.
+2. Confirm the standard details as given in the context: PO number/reference, component,
+   quantity, agreed price, and delivery date/timeline. Use a placeholder like [PO number] or
+   [delivery date] for anything not given in the context -- don't invent specifics.
+3. State that production will begin upon receipt of the advance payment (50% advance, as per
+   the agreed terms), if payment hasn't already been confirmed in the context.
+4. Reassure them they'll be kept updated on progress, and give a point of contact for
+   questions.
+
+Keep it concise and confirmatory -- the goal is to reassure the client the order is accepted
+and moving forward, not to repeat the whole quotation.
