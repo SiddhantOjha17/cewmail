@@ -9,11 +9,14 @@
 <body>
   <header class="topbar">
     <h1>cewmail</h1>
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="compose">Compose</button>
-      <button class="tab-btn" data-tab="inbox">Inbox</button>
-    </nav>
   </header>
+
+  <div class="tab-bar">
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="compose" role="tab">Compose</button>
+      <button class="tab-btn" data-tab="inbox" role="tab">Inbox</button>
+    </div>
+  </div>
 
   <main>
     <section id="tab-compose" class="tab-panel active">
@@ -27,9 +30,9 @@
           <label for="category">Category</label>
           <div class="category-row">
             <select id="category" name="category">
-              <option value="">(none / general)</option>
+              <option value="">General (no template)</option>
               {% for c in categories %}
-              <option value="{{ c }}">{{ c }}</option>
+              <option value="{{ c.name }}">{{ c.label }}</option>
               {% endfor %}
             </select>
             <button type="button" id="add-category-btn" class="secondary-btn">+ Add category</button>
@@ -42,7 +45,9 @@
           <label for="new-category-template">Template instructions</label>
           <textarea id="new-category-template" rows="5" placeholder="Describe tone/structure for this category..."></textarea>
           <div class="btn-row">
-            <button type="button" id="save-category-btn" class="primary-btn">Save category</button>
+            <button type="button" id="save-category-btn" class="primary-btn">
+              <span class="btn-label">Save category</span>
+            </button>
             <button type="button" id="cancel-category-btn" class="link-btn">cancel</button>
           </div>
           <p id="add-category-error" class="error-text" hidden></p>
@@ -63,7 +68,9 @@
           <input type="file" id="attachments" name="attachments" multiple>
         </div>
 
-        <button type="button" id="generate-btn" class="primary-btn">Generate drafts</button>
+        <button type="button" id="generate-btn" class="primary-btn">
+          <span class="btn-label">Generate drafts</span>
+        </button>
         <p id="generate-error" class="error-text" hidden></p>
       </form>
 
@@ -79,7 +86,29 @@
         <input type="text" id="edit-subject">
         <label for="edit-body">Body</label>
         <textarea id="edit-body" rows="12"></textarea>
-        <button type="button" id="send-btn" class="primary-btn">Send</button>
+
+        <div class="tweak-box card">
+          <h3>Tweak this draft</h3>
+          <div class="chip-row" id="tweak-chips">
+            <button type="button" class="chip" data-tweak="Make it noticeably shorter and more to the point.">Shorter</button>
+            <button type="button" class="chip" data-tweak="Make the tone more formal and professional.">More formal</button>
+            <button type="button" class="chip" data-tweak="Make the tone more casual and friendly.">More casual</button>
+            <button type="button" class="chip" data-tweak="Add a bit more detail and context.">More detailed</button>
+            <button type="button" class="chip" data-tweak="Make it sound warmer and friendlier.">Friendlier</button>
+            <button type="button" class="chip" data-tweak="Fix any grammar or wording issues, keep meaning the same.">Fix grammar</button>
+          </div>
+          <div class="custom-tweak-row">
+            <input type="text" id="custom-tweak-input" placeholder="Or describe your own tweak...">
+            <button type="button" id="apply-custom-tweak-btn" class="secondary-btn">
+              <span class="btn-label">Apply</span>
+            </button>
+          </div>
+          <p id="tweak-error" class="error-text" hidden></p>
+        </div>
+
+        <button type="button" id="send-btn" class="primary-btn">
+          <span class="btn-label">Send</span>
+        </button>
         <p id="send-error" class="error-text" hidden></p>
       </section>
 
@@ -91,7 +120,9 @@
 
     <section id="tab-inbox" class="tab-panel">
       <div class="btn-row">
-        <button type="button" id="refresh-inbox-btn" class="secondary-btn">Refresh</button>
+        <button type="button" id="refresh-inbox-btn" class="secondary-btn">
+          <span class="btn-label">Refresh</span>
+        </button>
       </div>
       <p id="inbox-error" class="error-text" hidden></p>
       <ul id="inbox-list" class="inbox-list"></ul>

@@ -2,9 +2,32 @@
   "use strict";
 
   const state = {
-    reply: null, // { uid, from, message_id, references, body }
+    reply: null, // { uid, message_id, references, body }
     drafts: [],
   };
+
+  // ---------- loading helper ----------
+  function setLoading(btn, loading, loadingText) {
+    const label = btn.querySelector(".btn-label");
+    if (loading) {
+      btn.disabled = true;
+      btn.dataset.prevHtml = label ? label.innerHTML : btn.innerHTML;
+      const html = `<span class="spinner"></span>${loadingText || "Working..."}`;
+      if (label) label.innerHTML = html;
+      else btn.innerHTML = html;
+    } else {
+      btn.disabled = false;
+      const html = btn.dataset.prevHtml;
+      if (html !== undefined) {
+        if (label) label.innerHTML = html;
+        else btn.innerHTML = html;
+      }
+    }
+  }
+
+  function prettyName(name) {
+    return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 
   // ---------- tabs ----------
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -21,6 +44,7 @@
   const addCategoryBtn = document.getElementById("add-category-btn");
   const addCategoryForm = document.getElementById("add-category-form");
   const addCategoryError = document.getElementById("add-category-error");
+  const saveCategoryBtn = document.getElementById("save-category-btn");
 
   addCategoryBtn.addEventListener("click", () => {
     addCategoryForm.hidden = false;
@@ -33,7 +57,7 @@
     addCategoryError.hidden = true;
   });
 
-  document.getElementById("save-category-btn").addEventListener("click", async () => {
+  saveCategoryBtn.addEventListener("click", async () => {
     const name = document.getElementById("new-category-name").value.trim();
     const template = document.getElementById("new-category-template").value.trim();
     addCategoryError.hidden = true;
@@ -44,6 +68,7 @@
       return;
     }
 
+    setLoading(saveCategoryBtn, true, "Saving...");
     try {
       const res = await fetch("/api/categories", {
         method: "POST",
@@ -56,7 +81,7 @@
       const select = document.getElementById("category");
       const opt = document.createElement("option");
       opt.value = data.name;
-      opt.textContent = data.name;
+      opt.textContent = data.label || prettyName(data.name);
       select.appendChild(opt);
       select.value = data.name;
 
@@ -67,6 +92,8 @@
     } catch (err) {
       addCategoryError.textContent = err.message;
       addCategoryError.hidden = false;
+    } finally {
+      setLoading(saveCategoryBtn, false);
     }
   });
 
@@ -90,8 +117,7 @@
       return;
     }
 
-    generateBtn.disabled = true;
-    generateBtn.textContent = "Generating...";
+    setLoading(generateBtn, true, "Generating...");
 
     try {
       const res = await fetch("/api/generate", {
@@ -108,25 +134,28 @@
 
       state.drafts = data.drafts;
       renderDrafts();
-
-      if (data.backend === "openai") {
-        backendNote.textContent = "Note: Gemini was unavailable, so this used the OpenAI fallback.";
-        backendNote.hidden = false;
-      } else {
-        backendNote.hidden = true;
-      }
+      showBackendNote(backendNote, data.backend);
 
       draftsSection.hidden = false;
       editorSection.hidden = true;
       confirmationSection.hidden = true;
+      draftsSection.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       generateError.textContent = err.message;
       generateError.hidden = false;
     } finally {
-      generateBtn.disabled = false;
-      generateBtn.textContent = "Generate drafts";
+      setLoading(generateBtn, false);
     }
   });
+
+  function showBackendNote(el, backend) {
+    if (backend === "openai") {
+      el.textContent = "Note: Gemini was unavailable, so this used the OpenAI fallback.";
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+    }
+  }
 
   function renderDrafts() {
     draftsList.innerHTML = "";
@@ -148,9 +177,66 @@
     const draft = state.drafts[i];
     document.getElementById("edit-subject").value = draft.subject;
     document.getElementById("edit-body").value = draft.body;
+    document.getElementById("tweak-error").hidden = true;
     editorSection.hidden = false;
     editorSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ---------- tweak ----------
+  const tweakError = document.getElementById("tweak-error");
+  const customTweakInput = document.getElementById("custom-tweak-input");
+  const applyCustomTweakBtn = document.getElementById("apply-custom-tweak-btn");
+
+  async function applyTweak(instruction, triggerBtn) {
+    tweakError.hidden = true;
+    const subject = document.getElementById("edit-subject").value.trim();
+    const body = document.getElementById("edit-body").value.trim();
+
+    if (!subject || !body) {
+      tweakError.textContent = "Nothing to tweak yet.";
+      tweakError.hidden = false;
+      return;
+    }
+
+    const allTweakButtons = document.querySelectorAll("#tweak-chips .chip, #apply-custom-tweak-btn");
+    allTweakButtons.forEach((b) => { if (b !== triggerBtn) b.disabled = true; });
+    if (triggerBtn) setLoading(triggerBtn, true, "Tweaking...");
+
+    try {
+      const res = await fetch("/api/tweak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, body, instruction }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not apply tweak.");
+
+      document.getElementById("edit-subject").value = data.draft.subject;
+      document.getElementById("edit-body").value = data.draft.body;
+    } catch (err) {
+      tweakError.textContent = err.message;
+      tweakError.hidden = false;
+    } finally {
+      allTweakButtons.forEach((b) => { b.disabled = false; });
+      if (triggerBtn) setLoading(triggerBtn, false);
+    }
+  }
+
+  document.querySelectorAll("#tweak-chips .chip").forEach((chip) => {
+    chip.addEventListener("click", () => applyTweak(chip.dataset.tweak, chip));
+  });
+
+  applyCustomTweakBtn.addEventListener("click", () => {
+    const instruction = customTweakInput.value.trim();
+    if (!instruction) {
+      tweakError.textContent = "Describe the tweak you want first.";
+      tweakError.hidden = false;
+      return;
+    }
+    applyTweak(instruction, applyCustomTweakBtn).then(() => {
+      customTweakInput.value = "";
+    });
+  });
 
   // ---------- send ----------
   const sendBtn = document.getElementById("send-btn");
@@ -181,8 +267,7 @@
       formData.append("attachments", file);
     }
 
-    sendBtn.disabled = true;
-    sendBtn.textContent = "Sending...";
+    setLoading(sendBtn, true, "Sending...");
 
     try {
       const res = await fetch("/api/send", { method: "POST", body: formData });
@@ -193,16 +278,15 @@
     } catch (err) {
       showConfirmation(false, err.message);
     } finally {
-      sendBtn.disabled = false;
-      sendBtn.textContent = "Send";
+      setLoading(sendBtn, false);
     }
   });
 
   function showConfirmation(success, message) {
     const box = document.getElementById("confirmation-box");
     box.textContent = message;
-    box.style.borderColor = success ? "#2e8b57" : "#c0392b";
-    box.style.color = success ? "#2e8b57" : "#c0392b";
+    box.style.borderColor = success ? "var(--success)" : "var(--error)";
+    box.style.color = success ? "var(--success)" : "var(--error)";
     confirmationSection.hidden = false;
     editorSection.hidden = true;
     draftsSection.hidden = true;
@@ -230,8 +314,9 @@
   // ---------- inbox ----------
   const inboxList = document.getElementById("inbox-list");
   const inboxError = document.getElementById("inbox-error");
+  const refreshInboxBtn = document.getElementById("refresh-inbox-btn");
 
-  document.getElementById("refresh-inbox-btn").addEventListener("click", loadInbox);
+  refreshInboxBtn.addEventListener("click", () => fetchInbox());
 
   let inboxLoaded = false;
   function loadInbox() {
@@ -241,7 +326,8 @@
 
   async function fetchInbox() {
     inboxError.hidden = true;
-    inboxList.innerHTML = "<li class=\"muted-text\">Loading...</li>";
+    setLoading(refreshInboxBtn, true, "Loading...");
+    inboxList.innerHTML = "";
     try {
       const res = await fetch("/api/inbox?limit=25");
       const data = await res.json();
@@ -252,6 +338,8 @@
       inboxList.innerHTML = "";
       inboxError.textContent = err.message;
       inboxError.hidden = false;
+    } finally {
+      setLoading(refreshInboxBtn, false);
     }
   }
 
@@ -268,14 +356,16 @@
         <div class="meta"><span>${escapeHtml(m.from)}</span><span>${escapeHtml(m.date)}</span></div>
         <div class="subject">${escapeHtml(m.subject)}</div>
         <div class="preview">${escapeHtml(m.preview)}</div>
-        <button type="button" class="secondary-btn reply-btn">Reply</button>
+        <button type="button" class="secondary-btn reply-btn"><span class="btn-label">Reply</span></button>
       `;
-      li.querySelector(".reply-btn").addEventListener("click", () => startReply(m.uid));
+      li.querySelector(".reply-btn").addEventListener("click", (e) => startReply(m.uid, e.currentTarget));
       inboxList.appendChild(li);
     });
   }
 
-  async function startReply(uid) {
+  async function startReply(uid, triggerBtn) {
+    inboxError.hidden = true;
+    if (triggerBtn) setLoading(triggerBtn, true, "Loading...");
     try {
       const res = await fetch(`/api/inbox/${encodeURIComponent(uid)}`);
       const data = await res.json();
@@ -305,6 +395,8 @@
     } catch (err) {
       inboxError.textContent = err.message;
       inboxError.hidden = false;
+    } finally {
+      if (triggerBtn) setLoading(triggerBtn, false);
     }
   }
 

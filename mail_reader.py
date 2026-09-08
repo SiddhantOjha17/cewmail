@@ -78,34 +78,30 @@ def list_recent_messages(limit: int = 25) -> list[dict]:
 
         messages = []
         for uid in recent_uids:
-            status, fetch_data = imap.uid("fetch", uid, "(BODY.PEEK[HEADER] BODY.PEEK[TEXT]<0.400>)")
-            if status != "OK" or not fetch_data:
+            # Fetch the full message rather than a raw BODY[TEXT] byte-range: most real
+            # email is multipart, and a raw slice of the MIME source is boundary markers
+            # and sub-part headers, not readable text. _extract_body() below correctly
+            # walks the MIME tree to find the actual text/plain (or html-stripped) content.
+            status, fetch_data = imap.uid("fetch", uid, "(BODY.PEEK[])")
+            if status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
                 continue
 
-            header_bytes = b""
-            text_bytes = b""
-            for part in fetch_data:
-                if isinstance(part, tuple):
-                    section = part[0]
-                    if b"HEADER" in section:
-                        header_bytes = part[1]
-                    elif b"TEXT" in section:
-                        text_bytes = part[1]
+            raw = fetch_data[0][1]
+            msg = BytesParser(policy=policy.default).parsebytes(raw)
 
-            headers = BytesParser(policy=policy.default).parsebytes(header_bytes)
-            date_str = headers.get("Date", "")
+            date_str = msg.get("Date", "")
             try:
                 date_iso = parsedate_to_datetime(date_str).isoformat() if date_str else ""
             except Exception:
                 date_iso = date_str
 
-            preview_source = text_bytes.decode("utf-8", errors="replace")
-            preview = re.sub(r"\s+", " ", preview_source).strip()[:150]
+            body = _extract_body(msg)
+            preview = re.sub(r"\s+", " ", body).strip()[:150]
 
             messages.append({
                 "uid": uid.decode(),
-                "from": str(headers.get("From", "")),
-                "subject": str(headers.get("Subject", "(no subject)")),
+                "from": str(msg.get("From", "")),
+                "subject": str(msg.get("Subject", "(no subject)")),
                 "date": date_iso,
                 "preview": preview,
             })

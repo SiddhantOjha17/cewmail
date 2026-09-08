@@ -23,6 +23,10 @@ def sanitize_name(name: str) -> str:
     return name
 
 
+def pretty_name(name: str) -> str:
+    return name.replace("_", " ").strip().title()
+
+
 def list_categories() -> list[str]:
     EMAIL_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     return sorted(p.stem for p in EMAIL_TEMPLATES_DIR.glob("*.txt"))

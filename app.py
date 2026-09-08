@@ -16,12 +16,19 @@ app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # hard cap slightly above o
 
 @app.route("/")
 def index():
-    return render_template("index.html", categories=template_store.list_categories())
+    categories = template_store.list_categories()
+    return render_template(
+        "index.html",
+        categories=[{"name": c, "label": template_store.pretty_name(c)} for c in categories],
+    )
 
 
 @app.route("/api/categories", methods=["GET"])
 def api_list_categories():
-    return jsonify({"categories": template_store.list_categories()})
+    categories = template_store.list_categories()
+    return jsonify({
+        "categories": [{"name": c, "label": template_store.pretty_name(c)} for c in categories],
+    })
 
 
 @app.route("/api/categories", methods=["POST"])
@@ -40,7 +47,7 @@ def api_add_category():
     except FileExistsError:
         return jsonify({"error": f"Category '{name}' already exists."}), 409
 
-    return jsonify({"name": saved_name}), 201
+    return jsonify({"name": saved_name, "label": template_store.pretty_name(saved_name)}), 201
 
 
 @app.route("/api/inbox", methods=["GET"])
@@ -86,6 +93,26 @@ def api_generate():
         return jsonify({"error": f"Could not generate drafts: {e}"}), 502
 
     return jsonify({"drafts": drafts, "backend": backend})
+
+
+@app.route("/api/tweak", methods=["POST"])
+def api_tweak():
+    data = request.get_json(silent=True) or {}
+    subject = (data.get("subject") or "").strip()
+    body = (data.get("body") or "").strip()
+    instruction = (data.get("instruction") or "").strip()
+
+    if not subject or not body:
+        return jsonify({"error": "Nothing to tweak yet -- pick or write a draft first."}), 400
+    if not instruction:
+        return jsonify({"error": "Please specify what to tweak."}), 400
+
+    try:
+        draft, backend = llm_client.tweak_draft(subject, body, instruction)
+    except llm_client.LLMError as e:
+        return jsonify({"error": f"Could not apply tweak: {e}"}), 502
+
+    return jsonify({"draft": draft, "backend": backend})
 
 
 @app.route("/api/send", methods=["POST"])

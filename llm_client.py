@@ -1,4 +1,4 @@
-"""Generates email draft options: Gemini first (free tier), OpenAI as a silent fallback on failure."""
+"""Generates/refines email drafts: Gemini first (free tier), OpenAI as a silent fallback on failure."""
 
 import json
 import logging
@@ -53,12 +53,28 @@ def _build_prompt(template: str | None, context: str, source_email: str | None, 
     return "\n".join(parts)
 
 
-def _parse_fallback(raw_text: str) -> DraftResponse:
-    try:
-        data = json.loads(raw_text)
-        if isinstance(data, list):
+def _build_tweak_prompt(subject: str, body: str, instruction: str) -> str:
+    return "\n".join([
+        "Here is an email draft:",
+        f"Subject: {subject}",
+        "Body:",
+        body,
+        "",
+        f"Apply this specific tweak to it: {instruction.strip()}",
+        "",
+        "Keep everything else about the email the same unless the tweak requires "
+        "changing it. Return the revised subject and body.",
+    ])
+
+
+def _parse_fallback(raw_text: str, schema: type[BaseModel]) -> BaseModel:
+    def _coerce(data):
+        if schema is DraftResponse and isinstance(data, list):
             data = {"drafts": data}
-        return DraftResponse.model_validate(data)
+        return schema.model_validate(data)
+
+    try:
+        return _coerce(json.loads(raw_text))
     except Exception:
         pass
 
@@ -67,18 +83,17 @@ def _parse_fallback(raw_text: str) -> DraftResponse:
         match = re.search(r"(\{.*\}|\[.*\])", raw_text, re.DOTALL)
     if match:
         try:
-            data = json.loads(match.group(1))
-            if isinstance(data, list):
-                data = {"drafts": data}
-            return DraftResponse.model_validate(data)
+            return _coerce(json.loads(match.group(1)))
         except Exception:
             pass
 
-    logger.warning("Could not parse structured drafts from LLM output; returning raw text as a single draft.")
-    return DraftResponse(drafts=[DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")])
+    logger.warning("Could not parse structured output from LLM; falling back to raw text.")
+    if schema is DraftResponse:
+        return DraftResponse(drafts=[DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")])
+    return DraftEmail(subject="(could not parse model output)", body=raw_text or "<empty response>")
 
 
-def _generate_with_gemini(prompt: str, n: int) -> DraftResponse:
+def _call_gemini(prompt: str, schema: type[BaseModel]) -> BaseModel:
     if not config.GEMINI_API_KEY:
         raise LLMError("Gemini not configured (no GEMINI_API_KEY)")
 
@@ -92,7 +107,7 @@ def _generate_with_gemini(prompt: str, n: int) -> DraftResponse:
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
-                "response_schema": DraftResponse,
+                "response_schema": schema,
             },
         )
     except genai_errors.APIError as e:
@@ -101,12 +116,12 @@ def _generate_with_gemini(prompt: str, n: int) -> DraftResponse:
         raise LLMError(f"Gemini request failed: {e}") from e
 
     parsed = getattr(response, "parsed", None)
-    if isinstance(parsed, DraftResponse) and parsed.drafts:
+    if isinstance(parsed, schema):
         return parsed
-    return _parse_fallback(response.text or "")
+    return _parse_fallback(response.text or "", schema)
 
 
-def _generate_with_openai(prompt: str, n: int) -> DraftResponse:
+def _call_openai(prompt: str, schema: type[BaseModel]) -> BaseModel:
     if not config.OPENAI_API_KEY:
         raise LLMError("OpenAI not configured (no OPENAI_API_KEY)")
 
@@ -114,42 +129,36 @@ def _generate_with_openai(prompt: str, n: int) -> DraftResponse:
 
     try:
         client = OpenAI(api_key=config.OPENAI_API_KEY)
-        completion = client.chat.completions.create(
+        completion = client.chat.completions.parse(
             model=config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "draft_response",
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "drafts": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "subject": {"type": "string"},
-                                        "body": {"type": "string"},
-                                    },
-                                    "required": ["subject", "body"],
-                                    "additionalProperties": False,
-                                },
-                            }
-                        },
-                        "required": ["drafts"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
+            response_format=schema,
         )
     except OpenAIError as e:
         raise LLMError(f"OpenAI API error: {e}") from e
     except Exception as e:
         raise LLMError(f"OpenAI request failed: {e}") from e
 
-    text = completion.choices[0].message.content or ""
-    return _parse_fallback(text)
+    message = completion.choices[0].message
+    if message.parsed is not None:
+        return message.parsed
+    return _parse_fallback(message.content or "", schema)
+
+
+def _generate_structured(prompt: str, schema: type[BaseModel]) -> tuple[BaseModel, str]:
+    """Tries Gemini first, then OpenAI. Raises LLMError only if both fail/aren't configured."""
+    gemini_error: Exception | None = None
+    try:
+        return _call_gemini(prompt, schema), "gemini"
+    except LLMError as e:
+        gemini_error = e
+        logger.warning("Gemini call failed, falling back to OpenAI: %s", e)
+
+    try:
+        return _call_openai(prompt, schema), "openai"
+    except LLMError as e:
+        logger.error("OpenAI fallback also failed: %s", e)
+        raise gemini_error or e
 
 
 def generate_drafts(
@@ -158,20 +167,14 @@ def generate_drafts(
     source_email: str | None = None,
     n: int = 3,
 ) -> tuple[list[dict], str]:
-    """Returns (drafts, backend_used). Raises LLMError only if both backends fail/aren't configured."""
+    """Returns (drafts, backend_used)."""
     prompt = _build_prompt(template, context, source_email, n)
+    result, backend = _generate_structured(prompt, DraftResponse)
+    return [d.model_dump() for d in result.drafts], backend
 
-    gemini_error: Exception | None = None
-    try:
-        result = _generate_with_gemini(prompt, n)
-        return [d.model_dump() for d in result.drafts], "gemini"
-    except LLMError as e:
-        gemini_error = e
-        logger.warning("Gemini draft generation failed, falling back to OpenAI: %s", e)
 
-    try:
-        result = _generate_with_openai(prompt, n)
-        return [d.model_dump() for d in result.drafts], "openai"
-    except LLMError as e:
-        logger.error("OpenAI fallback also failed: %s", e)
-        raise gemini_error or e
+def tweak_draft(subject: str, body: str, instruction: str) -> tuple[dict, str]:
+    """Revises a single draft per a free-text instruction. Returns (draft, backend_used)."""
+    prompt = _build_tweak_prompt(subject, body, instruction)
+    result, backend = _generate_structured(prompt, DraftEmail)
+    return result.model_dump(), backend
