@@ -55,8 +55,12 @@ def api_add_category():
 @app.route("/api/inbox", methods=["GET"])
 def api_inbox():
     limit = request.args.get("limit", default=25, type=int)
+    query = request.args.get("q", default="", type=str)
     try:
-        messages = mail_reader.list_recent_messages(limit=limit)
+        if query.strip():
+            messages = mail_reader.search_messages(query, limit=limit)
+        else:
+            messages = mail_reader.list_recent_messages(limit=limit)
     except mail_reader.MailReaderError as e:
         return jsonify({"error": str(e)}), 502
     return jsonify({"messages": messages})

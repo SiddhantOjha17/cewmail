@@ -231,6 +231,23 @@ textarea { resize: vertical; }
   font-size: 14.5px;
 }
 
+.inbox-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.search-row {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.search-row input { flex: 1; margin-bottom: 0; }
+
 .inbox-list {
   list-style: none;
   padding: 0;

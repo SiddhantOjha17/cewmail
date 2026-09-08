@@ -338,31 +338,51 @@
   const inboxList = document.getElementById("inbox-list");
   const inboxError = document.getElementById("inbox-error");
   const refreshInboxBtn = document.getElementById("refresh-inbox-btn");
+  const searchInput = document.getElementById("inbox-search-input");
+  const searchBtn = document.getElementById("inbox-search-btn");
+  const searchStatus = document.getElementById("inbox-search-status");
 
-  refreshInboxBtn.addEventListener("click", () => fetchInbox());
+  refreshInboxBtn.addEventListener("click", () => {
+    searchInput.value = "";
+    fetchInbox("", refreshInboxBtn);
+  });
+
+  searchBtn.addEventListener("click", () => fetchInbox(searchInput.value.trim(), searchBtn));
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") fetchInbox(searchInput.value.trim(), searchBtn);
+  });
 
   let inboxLoaded = false;
   function loadInbox() {
-    if (inboxLoaded) return; // avoid refetching every tab switch; use Refresh button instead
-    fetchInbox();
+    if (inboxLoaded) return; // avoid refetching every tab switch; use Refresh/Search to reload
+    fetchInbox("", refreshInboxBtn);
   }
 
-  async function fetchInbox() {
+  async function fetchInbox(query, triggerBtn) {
     inboxError.hidden = true;
-    setLoading(refreshInboxBtn, true, "Loading...");
+    setLoading(triggerBtn, true, query ? "Searching..." : "Loading...");
     inboxList.innerHTML = "";
     try {
-      const res = await fetch("/api/inbox?limit=25");
+      const url = query ? `/api/inbox?limit=25&q=${encodeURIComponent(query)}` : "/api/inbox?limit=25";
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load inbox.");
       inboxLoaded = true;
+
+      if (query) {
+        searchStatus.textContent = `${data.messages.length} result(s) for "${query}"`;
+        searchStatus.hidden = false;
+      } else {
+        searchStatus.hidden = true;
+      }
+
       renderInbox(data.messages);
     } catch (err) {
       inboxList.innerHTML = "";
       inboxError.textContent = err.message;
       inboxError.hidden = false;
     } finally {
-      setLoading(refreshInboxBtn, false);
+      setLoading(triggerBtn, false);
     }
   }
 

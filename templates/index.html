@@ -131,11 +131,18 @@
     </section>
 
     <section id="tab-inbox" class="tab-panel">
-      <div class="btn-row">
+      <div class="inbox-toolbar">
+        <div class="search-row">
+          <input type="text" id="inbox-search-input" placeholder="Search mailbox (subject, sender, body)...">
+          <button type="button" id="inbox-search-btn" class="secondary-btn">
+            <span class="btn-label">Search</span>
+          </button>
+        </div>
         <button type="button" id="refresh-inbox-btn" class="secondary-btn">
           <span class="btn-label">Refresh</span>
         </button>
       </div>
+      <p id="inbox-search-status" class="muted-text" hidden></p>
       <p id="inbox-error" class="error-text" hidden></p>
       <ul id="inbox-list" class="inbox-list"></ul>
     </section>
