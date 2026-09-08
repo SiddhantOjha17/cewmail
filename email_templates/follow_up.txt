@@ -1,0 +1,12 @@
+Purpose: A polite nudge on a previous email, proposal, or conversation that hasn't received a response yet.
+
+Tone: Friendly, brief, and low-pressure -- never guilt-trippy or pushy.
+
+Structure to follow:
+1. Reference the earlier email/conversation briefly (what it was about, and roughly when, if given in the context).
+2. Restate in one line why it matters or what the ask was, so the recipient doesn't have to dig up the old thread.
+3. Ask directly but politely for an update or next step.
+4. Offer an easy out (e.g. "no worries if now isn't a good time, just let me know") if appropriate to the context.
+5. Sign off warmly.
+
+Keep it short -- 3-5 sentences. The goal is to prompt a reply, not to repeat the entire original message.

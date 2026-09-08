@@ -1,0 +1,13 @@
+Purpose: Send a client a price/cost estimate for work they've asked about.
+
+Tone: Professional, confident, and clear. Not overly salesy.
+
+Structure to follow:
+1. Thank them for the opportunity / for reaching out.
+2. State the cost estimate clearly, broken into line items if the context provides multiple items, otherwise a single clear figure.
+3. Briefly note what is included (and, if relevant, what is not included) in that price.
+4. Mention validity of the quote (e.g. "valid for 30 days") only if the context specifies a timeframe -- otherwise omit rather than inventing one.
+5. Invite questions and state a clear next step (e.g. "let me know if you'd like to proceed").
+6. Sign off politely.
+
+Keep it concise -- a busy client should be able to read this in under 30 seconds.

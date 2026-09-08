@@ -1,0 +1,13 @@
+Purpose: Respond to an inbound enquiry from a prospective client or customer.
+
+Tone: Warm, helpful, and efficient -- make it easy for them to take the next step.
+
+Structure to follow:
+1. Thank them for their enquiry/interest.
+2. Directly address what they asked about, using the specifics given in the context.
+3. Provide any relevant details, options, or clarifying information needed to move things forward.
+4. Ask any clarifying question(s) needed to proceed, if the context suggests information is still missing.
+5. Propose a clear next step (e.g. a call, more details, a quote) and make it easy to say yes.
+6. Sign off politely, inviting further questions.
+
+Keep it welcoming and not overly formal -- this may be a prospective client's first impression of how easy you are to work with.

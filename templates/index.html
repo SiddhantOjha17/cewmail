@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cewmail</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <h1>cewmail</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="compose">Compose</button>
+      <button class="tab-btn" data-tab="inbox">Inbox</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-compose" class="tab-panel active">
+      <div id="reply-banner" class="reply-banner" hidden>
+        Replying to <strong id="reply-banner-from"></strong>
+        <button id="reply-cancel" type="button" class="link-btn">cancel</button>
+      </div>
+
+      <form id="compose-form">
+        <div class="field-row">
+          <label for="category">Category</label>
+          <div class="category-row">
+            <select id="category" name="category">
+              <option value="">(none / general)</option>
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" id="add-category-btn" class="secondary-btn">+ Add category</button>
+          </div>
+        </div>
+
+        <div id="add-category-form" class="card" hidden>
+          <label for="new-category-name">New category name</label>
+          <input type="text" id="new-category-name" placeholder="e.g. renewal">
+          <label for="new-category-template">Template instructions</label>
+          <textarea id="new-category-template" rows="5" placeholder="Describe tone/structure for this category..."></textarea>
+          <div class="btn-row">
+            <button type="button" id="save-category-btn" class="primary-btn">Save category</button>
+            <button type="button" id="cancel-category-btn" class="link-btn">cancel</button>
+          </div>
+          <p id="add-category-error" class="error-text" hidden></p>
+        </div>
+
+        <div class="field-row">
+          <label for="recipient">Recipient</label>
+          <input type="email" id="recipient" name="recipient" placeholder="someone@example.com" required>
+        </div>
+
+        <div class="field-row">
+          <label for="context">Context for this email</label>
+          <textarea id="context" name="context" rows="4" placeholder="What does this email need to say?" required></textarea>
+        </div>
+
+        <div class="field-row">
+          <label for="attachments">Attachments (optional)</label>
+          <input type="file" id="attachments" name="attachments" multiple>
+        </div>
+
+        <button type="button" id="generate-btn" class="primary-btn">Generate drafts</button>
+        <p id="generate-error" class="error-text" hidden></p>
+      </form>
+
+      <section id="drafts-section" hidden>
+        <h2>Pick a draft</h2>
+        <p id="backend-note" class="muted-text" hidden></p>
+        <div id="drafts-list" class="drafts-list"></div>
+      </section>
+
+      <section id="editor-section" hidden>
+        <h2>Edit &amp; send</h2>
+        <label for="edit-subject">Subject</label>
+        <input type="text" id="edit-subject">
+        <label for="edit-body">Body</label>
+        <textarea id="edit-body" rows="12"></textarea>
+        <button type="button" id="send-btn" class="primary-btn">Send</button>
+        <p id="send-error" class="error-text" hidden></p>
+      </section>
+
+      <section id="confirmation-section" hidden>
+        <div id="confirmation-box" class="card"></div>
+        <button type="button" id="new-email-btn" class="secondary-btn">Compose another</button>
+      </section>
+    </section>
+
+    <section id="tab-inbox" class="tab-panel">
+      <div class="btn-row">
+        <button type="button" id="refresh-inbox-btn" class="secondary-btn">Refresh</button>
+      </div>
+      <p id="inbox-error" class="error-text" hidden></p>
+      <ul id="inbox-list" class="inbox-list"></ul>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
