@@ -300,6 +300,48 @@ textarea { resize: vertical; }
 
 .custom-tweak-row input { flex: 1; margin-bottom: 0; }
 
+.preview-heading {
+  margin-top: 24px;
+}
+
+.email-preview {
+  padding: 0;
+  overflow: hidden;
+}
+
+.preview-meta {
+  padding: 16px 20px;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-meta > div {
+  display: flex;
+  gap: 10px;
+  font-size: 14.5px;
+  padding: 3px 0;
+}
+
+.preview-label {
+  color: var(--muted);
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.preview-body {
+  padding: 22px 20px 6px;
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  min-height: 40px;
+}
+
+.preview-signature {
+  padding: 0 20px 20px;
+  overflow-x: auto;
+}
+
 /* --- loading spinner --- */
 .spinner {
   display: inline-block;

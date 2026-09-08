@@ -3,6 +3,7 @@ import logging
 from flask import Flask, jsonify, render_template, request
 
 import config
+import email_signature
 import llm_client
 import mail_reader
 import mailer
@@ -20,6 +21,7 @@ def index():
     return render_template(
         "index.html",
         categories=[{"name": c, "label": template_store.pretty_name(c)} for c in categories],
+        signature_html=email_signature.get_signature_html(),
     )
 
 

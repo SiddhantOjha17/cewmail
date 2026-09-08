@@ -85,7 +85,7 @@
         <label for="edit-subject">Subject</label>
         <input type="text" id="edit-subject">
         <label for="edit-body">Body</label>
-        <textarea id="edit-body" rows="12"></textarea>
+        <textarea id="edit-body" rows="10"></textarea>
 
         <div class="tweak-box card">
           <h3>Tweak this draft</h3>
@@ -106,11 +106,23 @@
           <p id="tweak-error" class="error-text" hidden></p>
         </div>
 
+        <h3 class="preview-heading">Preview -- exactly what will be sent</h3>
+        <div class="email-preview card">
+          <div class="preview-meta">
+            <div><span class="preview-label">To</span><span id="preview-recipient">—</span></div>
+            <div><span class="preview-label">Subject</span><span id="preview-subject">—</span></div>
+          </div>
+          <div id="preview-body" class="preview-body"></div>
+          <div id="preview-signature" class="preview-signature"></div>
+        </div>
+
         <button type="button" id="send-btn" class="primary-btn">
           <span class="btn-label">Send</span>
         </button>
         <p id="send-error" class="error-text" hidden></p>
       </section>
+
+      <template id="signature-template">{{ signature_html | safe }}</template>
 
       <section id="confirmation-section" hidden>
         <div id="confirmation-box" class="card"></div>

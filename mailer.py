@@ -1,10 +1,12 @@
 """Sends email via Gmail SMTP (app password), stdlib only, attachments read straight from upload streams."""
 
+import html as html_module
 import mimetypes
 import smtplib
 from email.message import EmailMessage
 
 import config
+import email_signature
 
 
 class MailerError(Exception):
@@ -16,6 +18,26 @@ def clean_subject_for_reply(subject: str) -> str:
     if not subject:
         return "Re:"
     return subject if subject.lower().startswith("re:") else f"Re: {subject}"
+
+
+def _body_to_html(body: str) -> str:
+    return html_module.escape(body).replace("\n", "<br>\n")
+
+
+def _build_bodies(body: str) -> tuple[str, str]:
+    """Returns (plain_text, html) with the signature appended to both."""
+    signature_text = email_signature.get_signature_text()
+    signature_html = email_signature.get_signature_html()
+
+    plain = f"{body}\n\n{signature_text}" if signature_text else body
+
+    html_parts = [f'<div style="font-family: Arial, sans-serif; font-size: 15px; '
+                  f'line-height: 1.5; color: #111111;">{_body_to_html(body)}</div>']
+    if signature_html:
+        html_parts.append(signature_html)
+    html = "\n".join(html_parts)
+
+    return plain, html
 
 
 def send_email(
@@ -55,6 +77,8 @@ def send_email(
             f"keep combined attachments under {config.MAX_ATTACHMENT_BYTES / 1024 / 1024:.0f} MB."
         )
 
+    plain_body, html_body = _build_bodies(body)
+
     msg = EmailMessage()
     msg["From"] = config.GMAIL_ADDRESS
     msg["To"] = to
@@ -62,7 +86,8 @@ def send_email(
     if in_reply_to:
         msg["In-Reply-To"] = in_reply_to
         msg["References"] = f"{references} {in_reply_to}".strip() if references else in_reply_to
-    msg.set_content(body)
+    msg.set_content(plain_body)
+    msg.add_alternative(html_body, subtype="html")
 
     for filename, data in read_attachments:
         mime_type, _ = mimetypes.guess_type(filename)

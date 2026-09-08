@@ -16,6 +16,20 @@ GENERIC_INSTRUCTION = (
     "so use your best judgment on tone and structure."
 )
 
+SIGNOFF_INSTRUCTION = (
+    "Do not write a signature block, sign-off name, job title, company name, or "
+    "contact details at the end of the email -- a real signature is appended "
+    "automatically after your text. End with a short closing line with no name "
+    "after it (e.g. 'Best regards,'), or omit a closing line entirely if it doesn't fit."
+)
+
+PLACEHOLDER_INSTRUCTION = (
+    "If the context above already gives you real names, companies, amounts, dates, "
+    "or other specifics, use them directly instead of a placeholder. Only use a "
+    "bracketed placeholder like [detail] for information that is genuinely unknown "
+    "and necessary to the email."
+)
+
 
 class DraftEmail(BaseModel):
     subject: str
@@ -49,6 +63,9 @@ def _build_prompt(template: str | None, context: str, source_email: str | None, 
         "",
         f"Generate exactly {n} distinct draft options (different in wording/approach, "
         "not just trivial rewording). Each needs a subject and a full body.",
+        "",
+        SIGNOFF_INSTRUCTION,
+        PLACEHOLDER_INSTRUCTION,
     ]
     return "\n".join(parts)
 
@@ -64,6 +81,9 @@ def _build_tweak_prompt(subject: str, body: str, instruction: str) -> str:
         "",
         "Keep everything else about the email the same unless the tweak requires "
         "changing it. Return the revised subject and body.",
+        "",
+        SIGNOFF_INSTRUCTION,
+        PLACEHOLDER_INSTRUCTION,
     ])
 
 

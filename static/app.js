@@ -179,8 +179,30 @@
     document.getElementById("edit-body").value = draft.body;
     document.getElementById("tweak-error").hidden = true;
     editorSection.hidden = false;
+    updatePreview();
     editorSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // ---------- live preview ----------
+  const previewSignature = document.getElementById("preview-signature");
+  const signatureTemplate = document.getElementById("signature-template");
+  if (signatureTemplate) {
+    previewSignature.innerHTML = signatureTemplate.innerHTML;
+  }
+
+  function updatePreview() {
+    const recipient = document.getElementById("recipient").value.trim();
+    const subject = document.getElementById("edit-subject").value.trim();
+    const body = document.getElementById("edit-body").value;
+
+    document.getElementById("preview-recipient").textContent = recipient || "(recipient)";
+    document.getElementById("preview-subject").textContent = subject || "(no subject)";
+    document.getElementById("preview-body").textContent = body;
+  }
+
+  document.getElementById("edit-subject").addEventListener("input", updatePreview);
+  document.getElementById("edit-body").addEventListener("input", updatePreview);
+  document.getElementById("recipient").addEventListener("input", updatePreview);
 
   // ---------- tweak ----------
   const tweakError = document.getElementById("tweak-error");
@@ -213,6 +235,7 @@
 
       document.getElementById("edit-subject").value = data.draft.subject;
       document.getElementById("edit-body").value = data.draft.body;
+      updatePreview();
     } catch (err) {
       tweakError.textContent = err.message;
       tweakError.hidden = false;
