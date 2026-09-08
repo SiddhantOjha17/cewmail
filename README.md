@@ -76,7 +76,10 @@ reachable at http://127.0.0.1:5000 on that machine.
 
 ## Updating the Windows deployment
 
-After pushing new commits to your remote, on the Windows machine run:
+After pushing new commits to your remote, on the Windows machine, from an
+**elevated (Administrator) Command Prompt** (restarting a Windows service
+always needs admin rights -- an unelevated prompt fails on the final step
+with "OpenService() is denied"), run:
 
 ```
 deploy\update.bat
@@ -89,6 +92,9 @@ takes down the running service.
 ## Troubleshooting
 
 - **Service won't start**: check `logs\service.err.log` in the project folder.
+- **"OpenService() is denied"** (from `install_service.bat` or `update.bat`):
+  the Command Prompt isn't elevated -- right-click it and choose "Run as
+  administrator", then re-run the script.
 - **SMTP/IMAP auth errors**: regenerate the Gmail app password and update `.env`.
 - **"Could not generate drafts"**: check `GEMINI_API_KEY` (and `OPENAI_API_KEY` if
   you want the fallback to work); check quota/rate limits on whichever backend the

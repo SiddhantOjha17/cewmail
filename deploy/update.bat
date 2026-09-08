@@ -5,6 +5,11 @@ REM
 REM Requires: this checkout already has a git remote configured, e.g.
 REM   git remote add origin <your-repo-url>
 REM (set up once, manually, after cloning onto this Windows machine).
+REM
+REM MUST be run from an elevated (Administrator) Command Prompt --
+REM restarting a Windows service always requires admin rights, the
+REM same as the initial install. Running this unelevated fails with
+REM "OpenService() is denied" on the final restart step.
 REM ============================================================
 
 setlocal
@@ -28,5 +33,10 @@ if errorlevel 1 (
 )
 
 "%NSSM%" restart %SERVICE_NAME%
+if errorlevel 1 (
+    echo Restart failed - if you saw "OpenService() is denied", re-run this
+    echo script from an elevated ^(Administrator^) Command Prompt.
+    exit /b 1
+)
 echo Update complete, service restarted.
 endlocal
