@@ -30,6 +30,12 @@ PLACEHOLDER_INSTRUCTION = (
     "the sender to fill in before sending."
 )
 
+FORMATTING_INSTRUCTION = (
+    "Write the body as plain text -- it is not rendered as markdown, so do not use "
+    "markdown syntax like **bold**, _italics_, `code`, or # headings. Plain dashes "
+    "for a simple list are fine."
+)
+
 
 class DraftEmail(BaseModel):
     subject: str
@@ -76,6 +82,7 @@ def _build_prompt(template: str | None, context: str, source_email: str | None, 
         "",
         SIGNOFF_INSTRUCTION,
         PLACEHOLDER_INSTRUCTION,
+        FORMATTING_INSTRUCTION,
     ]
     return "\n".join(parts)
 
@@ -94,6 +101,7 @@ def _build_tweak_prompt(subject: str, body: str, instruction: str) -> str:
         "",
         SIGNOFF_INSTRUCTION,
         PLACEHOLDER_INSTRUCTION,
+        FORMATTING_INSTRUCTION,
     ])
 
 
