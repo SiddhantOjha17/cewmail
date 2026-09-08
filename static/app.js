@@ -376,7 +376,7 @@
       const li = document.createElement("li");
       li.className = "inbox-item";
       li.innerHTML = `
-        <div class="meta"><span>${escapeHtml(m.from)}</span><span>${escapeHtml(m.date)}</span></div>
+        <div class="meta"><span>${escapeHtml(m.from)}</span><span>${escapeHtml(formatDate(m.date))}</span></div>
         <div class="subject">${escapeHtml(m.subject)}</div>
         <div class="preview">${escapeHtml(m.preview)}</div>
         <button type="button" class="secondary-btn reply-btn"><span class="btn-label">Reply</span></button>
@@ -421,6 +421,26 @@
     } finally {
       if (triggerBtn) setLoading(triggerBtn, false);
     }
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const timePart = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+    if (isToday) return timePart;
+
+    const isThisYear = d.getFullYear() === now.getFullYear();
+    const datePart = d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: isThisYear ? undefined : "numeric",
+    });
+    return `${datePart}, ${timePart}`;
   }
 
   function escapeHtml(str) {

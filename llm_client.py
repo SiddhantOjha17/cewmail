@@ -17,17 +17,17 @@ GENERIC_INSTRUCTION = (
 )
 
 SIGNOFF_INSTRUCTION = (
-    "Do not write a signature block, sign-off name, job title, company name, or "
-    "contact details at the end of the email -- a real signature is appended "
-    "automatically after your text. End with a short closing line with no name "
-    "after it (e.g. 'Best regards,'), or omit a closing line entirely if it doesn't fit."
+    "End the email with a short closing line (e.g. 'Best regards,') followed by "
+    "the placeholder [Your Name] on its own line. Do not add a job title, company "
+    "name, or contact details after it -- a real signature block with those "
+    "details is appended automatically after your text."
 )
 
 PLACEHOLDER_INSTRUCTION = (
-    "If the context above already gives you real names, companies, amounts, dates, "
-    "or other specifics, use them directly instead of a placeholder. Only use a "
-    "bracketed placeholder like [detail] for information that is genuinely unknown "
-    "and necessary to the email."
+    "If the context above gives you real names, companies, amounts, dates, or "
+    "other specifics, use them directly. For anything relevant that isn't given "
+    "in the context, it's fine to leave a bracketed placeholder like [detail] for "
+    "the sender to fill in before sending."
 )
 
 
