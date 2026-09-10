@@ -4,7 +4,7 @@ import imaplib
 import re
 from email import policy
 from email.parser import BytesParser
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 
 import config
 
@@ -14,7 +14,17 @@ import config
 # ever pulling attachment bytes over the wire.
 PREVIEW_FETCH_BYTES = 12000
 
+# "All Mail" covers received + sent + archived messages (everything except Spam/Trash) in
+# one folder with one consistent UID space -- simpler and more complete than juggling
+# INBOX and Sent Mail separately, which would need cross-folder UID bookkeeping since IMAP
+# UIDs are only meaningful within the folder they were issued in.
+ALL_MAIL_FOLDER = '"[Gmail]/All Mail"'
+
 _UID_RE = re.compile(rb"UID (\d+)")
+
+
+def _is_from_self(from_header: str) -> bool:
+    return parseaddr(from_header)[1].lower() == config.GMAIL_ADDRESS.lower()
 
 
 class MailReaderError(Exception):
@@ -95,10 +105,13 @@ def _parse_fetch_response(fetch_data) -> list[dict]:
 
         body = _extract_body(msg)
         preview = re.sub(r"\s+", " ", body).strip()[:150]
+        from_header = str(msg.get("From", ""))
 
         messages.append({
             "uid": uid,
-            "from": str(msg.get("From", "")),
+            "from": from_header,
+            "to": str(msg.get("To", "")),
+            "sent": _is_from_self(from_header),
             "subject": str(msg.get("Subject", "(no subject)")),
             "date": date_iso,
             "preview": preview,
@@ -128,9 +141,9 @@ def _fetch_summaries_by_uid(imap: imaplib.IMAP4_SSL, uids: list[bytes]) -> list[
 def list_recent_messages(limit: int = 25) -> list[dict]:
     imap = _connect()
     try:
-        status, data = imap.select("INBOX", readonly=True)
+        status, data = imap.select(ALL_MAIL_FOLDER, readonly=True)
         if status != "OK":
-            raise MailReaderError("Could not open INBOX.")
+            raise MailReaderError("Could not open All Mail.")
 
         # SELECT's response already gives the total message count (EXISTS) -- no need for
         # a separate "SEARCH ALL" just to find out how many messages exist and slice the
@@ -149,10 +162,10 @@ def list_recent_messages(limit: int = 25) -> list[dict]:
 
 
 def search_messages(query: str, limit: int = 25) -> list[dict]:
-    """Searches the whole mailbox (not just the recently-fetched list) via Gmail's
-    X-GM-RAW extension -- the same search Gmail's own web UI does, including support for
-    operators like from:/subject:. A plain multi-word query (no operator) is wrapped as an
-    exact phrase rather than Gmail's default loose AND-of-words match, which tends to feel
+    """Searches the whole mailbox (received + sent, not just the recently-fetched list) via
+    Gmail's X-GM-RAW extension -- the same search Gmail's own web UI does, including support
+    for operators like from:/subject:. A plain multi-word query (no operator) is wrapped as
+    an exact phrase rather than Gmail's default loose AND-of-words match, which tends to feel
     more relevant for "find this email" style searches. Falls back to the recent list if
     the query is empty."""
     query = (query or "").strip()
@@ -161,9 +174,9 @@ def search_messages(query: str, limit: int = 25) -> list[dict]:
 
     imap = _connect()
     try:
-        status, _ = imap.select("INBOX", readonly=True)
+        status, _ = imap.select(ALL_MAIL_FOLDER, readonly=True)
         if status != "OK":
-            raise MailReaderError("Could not open INBOX.")
+            raise MailReaderError("Could not open All Mail.")
 
         gmail_query = query if ":" in query else f'"{query}"'
         imap_literal = '"' + gmail_query.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -184,9 +197,9 @@ def search_messages(query: str, limit: int = 25) -> list[dict]:
 def get_message(uid: str) -> dict:
     imap = _connect()
     try:
-        status, _ = imap.select("INBOX", readonly=True)
+        status, _ = imap.select(ALL_MAIL_FOLDER, readonly=True)
         if status != "OK":
-            raise MailReaderError("Could not open INBOX.")
+            raise MailReaderError("Could not open All Mail.")
 
         status, data = imap.uid("fetch", uid, "(RFC822)")
         if status != "OK" or not data or data[0] is None:
@@ -201,9 +214,13 @@ def get_message(uid: str) -> dict:
         except Exception:
             date_iso = date_str
 
+        from_header = str(msg.get("From", ""))
+
         return {
             "uid": uid,
-            "from": str(msg.get("From", "")),
+            "from": from_header,
+            "to": str(msg.get("To", "")),
+            "sent": _is_from_self(from_header),
             "subject": str(msg.get("Subject", "(no subject)")),
             "date": date_iso,
             "message_id": str(msg.get("Message-ID", "")),

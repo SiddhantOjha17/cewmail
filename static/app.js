@@ -395,8 +395,10 @@
     messages.forEach((m) => {
       const li = document.createElement("li");
       li.className = "inbox-item";
+      const counterpart = m.sent ? m.to : m.from;
+      const sentTag = m.sent ? '<span class="sent-tag">Sent</span>' : "";
       li.innerHTML = `
-        <div class="meta"><span>${escapeHtml(m.from)}</span><span>${escapeHtml(formatDate(m.date))}</span></div>
+        <div class="meta"><span>${sentTag}${escapeHtml(counterpart)}</span><span>${escapeHtml(formatDate(m.date))}</span></div>
         <div class="subject">${escapeHtml(m.subject)}</div>
         <div class="preview">${escapeHtml(m.preview)}</div>
         <button type="button" class="secondary-btn reply-btn"><span class="btn-label">Reply</span></button>
@@ -421,16 +423,17 @@
         body: data.body,
       };
 
-      // extract a bare email address from a "Name <email>" From header
-      const match = data.from.match(/<([^>]+)>/);
-      const recipientAddr = match ? match[1] : data.from;
+      // For a message you sent, reply to its recipient (To) rather than yourself (From).
+      const counterpart = data.sent ? data.to : data.from;
+      const match = counterpart.match(/<([^>]+)>/);
+      const recipientAddr = match ? match[1] : counterpart;
 
       document.getElementById("recipient").value = recipientAddr;
       document.getElementById("context").value = "";
       document.getElementById("edit-subject").value = data.reply_subject;
 
       const banner = document.getElementById("reply-banner");
-      document.getElementById("reply-banner-from").textContent = data.from;
+      document.getElementById("reply-banner-from").textContent = counterpart;
       banner.hidden = false;
 
       document.querySelector('.tab-btn[data-tab="compose"]').click();
