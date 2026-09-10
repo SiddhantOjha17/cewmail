@@ -8,6 +8,14 @@ from email.utils import parsedate_to_datetime
 
 import config
 
+# Bytes fetched per message for the list/search preview -- a partial fetch, so the IMAP
+# server slices before sending regardless of how big the full message (or its attachments)
+# actually is. Comfortably covers headers + a typical business email's text body without
+# ever pulling attachment bytes over the wire.
+PREVIEW_FETCH_BYTES = 12000
+
+_UID_RE = re.compile(rb"UID (\d+)")
+
 
 class MailReaderError(Exception):
     pass
@@ -62,18 +70,21 @@ def _extract_body(msg) -> str:
     return ""
 
 
-def _fetch_summaries(imap: imaplib.IMAP4_SSL, uids: list[bytes]) -> list[dict]:
+def _parse_fetch_response(fetch_data) -> list[dict]:
+    """Parses a (possibly multi-message) FETCH response fetched via a single batched
+    command, so this is O(1) network round trips regardless of how many messages matched.
+    Each message may come back with a partial/truncated body (see PREVIEW_FETCH_BYTES);
+    email.parser tolerates that fine for extracting the headers and an early text part."""
     messages = []
-    for uid in uids:
-        # Fetch the full message rather than a raw BODY[TEXT] byte-range: most real
-        # email is multipart, and a raw slice of the MIME source is boundary markers
-        # and sub-part headers, not readable text. _extract_body() below correctly
-        # walks the MIME tree to find the actual text/plain (or html-stripped) content.
-        status, fetch_data = imap.uid("fetch", uid, "(BODY.PEEK[])")
-        if status != "OK" or not fetch_data or not isinstance(fetch_data[0], tuple):
+    for part in fetch_data:
+        if not isinstance(part, tuple):
             continue
+        descriptor, raw = part
+        uid_match = _UID_RE.search(descriptor)
+        if not uid_match:
+            continue
+        uid = uid_match.group(1).decode()
 
-        raw = fetch_data[0][1]
         msg = BytesParser(policy=policy.default).parsebytes(raw)
 
         date_str = msg.get("Date", "")
@@ -86,30 +97,50 @@ def _fetch_summaries(imap: imaplib.IMAP4_SSL, uids: list[bytes]) -> list[dict]:
         preview = re.sub(r"\s+", " ", body).strip()[:150]
 
         messages.append({
-            "uid": uid.decode(),
+            "uid": uid,
             "from": str(msg.get("From", "")),
             "subject": str(msg.get("Subject", "(no subject)")),
             "date": date_iso,
             "preview": preview,
         })
 
+    messages.sort(key=lambda m: int(m["uid"]), reverse=True)  # newest first, regardless of response order
     return messages
+
+
+def _fetch_summaries_by_seq(imap: imaplib.IMAP4_SSL, seq_range: str) -> list[dict]:
+    status, fetch_data = imap.fetch(seq_range, f"(UID BODY.PEEK[]<0.{PREVIEW_FETCH_BYTES}>)")
+    if status != "OK":
+        raise MailReaderError("IMAP fetch failed.")
+    return _parse_fetch_response(fetch_data)
+
+
+def _fetch_summaries_by_uid(imap: imaplib.IMAP4_SSL, uids: list[bytes]) -> list[dict]:
+    if not uids:
+        return []
+    uid_set = b",".join(uids)
+    status, fetch_data = imap.uid("fetch", uid_set, f"(UID BODY.PEEK[]<0.{PREVIEW_FETCH_BYTES}>)")
+    if status != "OK":
+        raise MailReaderError("IMAP fetch failed.")
+    return _parse_fetch_response(fetch_data)
 
 
 def list_recent_messages(limit: int = 25) -> list[dict]:
     imap = _connect()
     try:
-        status, _ = imap.select("INBOX", readonly=True)
+        status, data = imap.select("INBOX", readonly=True)
         if status != "OK":
             raise MailReaderError("Could not open INBOX.")
 
-        status, data = imap.uid("search", None, "ALL")
-        if status != "OK":
-            raise MailReaderError("IMAP search failed.")
+        # SELECT's response already gives the total message count (EXISTS) -- no need for
+        # a separate "SEARCH ALL" just to find out how many messages exist and slice the
+        # last N; that used to list every single UID in the mailbox before trimming it down.
+        total = int(data[0]) if data and data[0] else 0
+        if total == 0:
+            return []
 
-        uids = data[0].split()
-        recent_uids = uids[-limit:][::-1]
-        return _fetch_summaries(imap, recent_uids)
+        start = max(1, total - limit + 1)
+        return _fetch_summaries_by_seq(imap, f"{start}:{total}")
     finally:
         try:
             imap.logout()
@@ -118,9 +149,12 @@ def list_recent_messages(limit: int = 25) -> list[dict]:
 
 
 def search_messages(query: str, limit: int = 25) -> list[dict]:
-    """Searches the whole mailbox (not just the recently-fetched list) via IMAP's TEXT
-    criterion, which matches against headers (from/subject) and body. Falls back to the
-    recent list if the query is empty."""
+    """Searches the whole mailbox (not just the recently-fetched list) via Gmail's
+    X-GM-RAW extension -- the same search Gmail's own web UI does, including support for
+    operators like from:/subject:. A plain multi-word query (no operator) is wrapped as an
+    exact phrase rather than Gmail's default loose AND-of-words match, which tends to feel
+    more relevant for "find this email" style searches. Falls back to the recent list if
+    the query is empty."""
     query = (query or "").strip()
     if not query:
         return list_recent_messages(limit=limit)
@@ -131,19 +165,15 @@ def search_messages(query: str, limit: int = 25) -> list[dict]:
         if status != "OK":
             raise MailReaderError("Could not open INBOX.")
 
-        # Gmail's IMAP server supports X-GM-RAW: the exact same search Gmail's own web
-        # search box does (and it accepts Gmail search operators like from:/subject: too),
-        # which gives far more relevant results than the generic RFC3501 TEXT criterion --
-        # Gmail routes TEXT through its own tokenized index rather than literal substring
-        # matching, so results for it can look surprisingly unrelated to the query.
-        escaped = query.replace("\\", "\\\\").replace('"', '\\"')
-        status, data = imap.uid("search", None, "X-GM-RAW", f'"{escaped}"')
+        gmail_query = query if ":" in query else f'"{query}"'
+        imap_literal = '"' + gmail_query.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        status, data = imap.uid("search", None, "X-GM-RAW", imap_literal)
         if status != "OK":
             raise MailReaderError("IMAP search failed.")
 
         uids = data[0].split()
-        matched_uids = uids[-limit:][::-1]  # newest matches first
-        return _fetch_summaries(imap, matched_uids)
+        matched_uids = uids[-limit:]  # cap to the most recent `limit` matches (by UID order)
+        return _fetch_summaries_by_uid(imap, matched_uids)
     finally:
         try:
             imap.logout()
