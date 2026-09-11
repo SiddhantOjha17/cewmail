@@ -67,6 +67,7 @@ def _build_prompt(
     n: int,
     recipient: str | None = None,
     reply_direction: str | None = None,
+    fixed_subject: str | None = None,
 ) -> str:
     parts = [template.strip() if template else GENERIC_INSTRUCTION]
 
@@ -103,6 +104,13 @@ def _build_prompt(
             "---",
             source_email.strip(),
             "---",
+        ]
+    if fixed_subject:
+        parts += [
+            "",
+            f"The subject line MUST be exactly: \"{fixed_subject}\" -- this is a reply, and "
+            "email clients rely on the subject staying unchanged (alongside other headers "
+            "you don't see) to keep it in the same conversation thread. Do not alter it.",
         ]
     if recipient:
         parts += [
@@ -257,12 +265,21 @@ def generate_drafts(
     n: int = 3,
     recipient: str | None = None,
     reply_direction: str | None = None,
+    fixed_subject: str | None = None,
 ) -> tuple[list[dict], str]:
-    """Returns (drafts, backend_used)."""
-    prompt = _build_prompt(template, context, source_email, n, recipient, reply_direction)
+    """Returns (drafts, backend_used). If fixed_subject is given (replying to an existing
+    thread), every draft's subject is forced to it after generation -- Gmail and other
+    clients weigh subject continuity alongside In-Reply-To/References when deciding whether
+    to group messages into the same conversation, so a model-invented subject can silently
+    break threading even when the headers are otherwise set correctly."""
+    prompt = _build_prompt(template, context, source_email, n, recipient, reply_direction, fixed_subject)
     strict_schema = _make_strict_draft_schema(n)
     result, backend = _generate_structured(prompt, strict_schema, DraftResponse)
-    return [d.model_dump() for d in result.drafts], backend
+    drafts = [d.model_dump() for d in result.drafts]
+    if fixed_subject:
+        for d in drafts:
+            d["subject"] = fixed_subject
+    return drafts, backend
 
 
 def tweak_draft(subject: str, body: str, instruction: str) -> tuple[dict, str]:

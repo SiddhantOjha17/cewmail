@@ -129,6 +129,7 @@
           source_email: state.reply ? state.reply.body : null,
           recipient: state.reply ? state.reply.counterpart : null,
           reply_direction: state.reply ? (state.reply.sent ? "sent" : "received") : null,
+          reply_subject: state.reply ? state.reply.subject : null,
         }),
       });
       const data = await res.json();
@@ -428,6 +429,7 @@
         body: data.body,
         counterpart: counterpart,
         sent: data.sent,
+        subject: data.reply_subject,
       };
 
       const match = counterpart.match(/<([^>]+)>/);

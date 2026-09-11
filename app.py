@@ -84,6 +84,7 @@ def api_generate():
     source_email = data.get("source_email") or None
     recipient = data.get("recipient") or None
     reply_direction = data.get("reply_direction") or None
+    fixed_subject = data.get("reply_subject") or None
 
     if not context and not source_email and not category:
         return jsonify({
@@ -103,6 +104,7 @@ def api_generate():
             template, context,
             source_email=source_email, n=3,
             recipient=recipient, reply_direction=reply_direction,
+            fixed_subject=fixed_subject,
         )
     except llm_client.LLMError as e:
         return jsonify({"error": f"Could not generate drafts: {e}"}), 502
