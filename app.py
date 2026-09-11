@@ -85,8 +85,11 @@ def api_generate():
     recipient = data.get("recipient") or None
     reply_direction = data.get("reply_direction") or None
 
-    if not context:
-        return jsonify({"error": "Please describe the context for this email."}), 400
+    if not context and not source_email and not category:
+        return jsonify({
+            "error": "Please select a category, add context, or reply to a message "
+                     "so there's something to draft from.",
+        }), 400
 
     template = None
     if category:

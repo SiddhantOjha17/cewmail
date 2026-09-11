@@ -111,8 +111,8 @@
     const context = document.getElementById("context").value.trim();
     generateError.hidden = true;
 
-    if (!context) {
-      generateError.textContent = "Please describe the context for this email.";
+    if (!context && !category && !state.reply) {
+      generateError.textContent = "Select a category, add context, or reply to a message first.";
       generateError.hidden = false;
       return;
     }

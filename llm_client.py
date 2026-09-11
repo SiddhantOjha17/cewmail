@@ -68,11 +68,20 @@ def _build_prompt(
     recipient: str | None = None,
     reply_direction: str | None = None,
 ) -> str:
-    parts = [
-        template.strip() if template else GENERIC_INSTRUCTION,
-        "",
-        f"Specific context for this email: {context.strip()}",
-    ]
+    parts = [template.strip() if template else GENERIC_INSTRUCTION]
+
+    context = (context or "").strip()
+    if context:
+        parts += ["", f"Specific context for this email: {context}"]
+    elif not source_email:
+        parts += [
+            "",
+            "No specific context was given for this email -- use your best judgment "
+            "based on the category description above.",
+        ]
+    # If context is empty but source_email is present, no extra line is needed here --
+    # the reference email below plus the template already give the model enough to work with.
+
     if source_email:
         if reply_direction == "sent":
             origin_note = (
