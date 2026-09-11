@@ -60,20 +60,47 @@ class LLMError(Exception):
     """Raised only for real API failures (auth, quota/rate-limit, network/timeout)."""
 
 
-def _build_prompt(template: str | None, context: str, source_email: str | None, n: int) -> str:
+def _build_prompt(
+    template: str | None,
+    context: str,
+    source_email: str | None,
+    n: int,
+    recipient: str | None = None,
+    reply_direction: str | None = None,
+) -> str:
     parts = [
         template.strip() if template else GENERIC_INSTRUCTION,
         "",
         f"Specific context for this email: {context.strip()}",
     ]
     if source_email:
+        if reply_direction == "sent":
+            origin_note = (
+                "The reference email below is a PREVIOUS message the sender (you) already "
+                "sent to the recipient -- it is written in YOUR voice, addressed TO the "
+                "recipient, not the other way around. It's given only for context on what "
+                "was previously discussed; do not mistake the name it's addressed to, or "
+                "the name it's signed with, for who you are now writing to."
+            )
+        else:
+            origin_note = (
+                "The reference email below was sent TO you BY the recipient -- it is "
+                "written in the recipient's voice. It's given only for context; do not "
+                "quote or repeat it verbatim, just respond appropriately to it."
+            )
         parts += [
             "",
-            "This is a reply. Below is the email you are replying to, for context only "
-            "-- do not quote or repeat it verbatim, just respond appropriately to it:",
+            origin_note,
             "---",
             source_email.strip(),
             "---",
+        ]
+    if recipient:
+        parts += [
+            "",
+            f"You are writing this new email TO: {recipient}. Address them by name if a "
+            "name is given here, regardless of any other names that appear in the "
+            "reference email above.",
         ]
     parts += [
         "",
@@ -219,9 +246,11 @@ def generate_drafts(
     context: str,
     source_email: str | None = None,
     n: int = 3,
+    recipient: str | None = None,
+    reply_direction: str | None = None,
 ) -> tuple[list[dict], str]:
     """Returns (drafts, backend_used)."""
-    prompt = _build_prompt(template, context, source_email, n)
+    prompt = _build_prompt(template, context, source_email, n, recipient, reply_direction)
     strict_schema = _make_strict_draft_schema(n)
     result, backend = _generate_structured(prompt, strict_schema, DraftResponse)
     return [d.model_dump() for d in result.drafts], backend

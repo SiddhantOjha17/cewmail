@@ -82,6 +82,8 @@ def api_generate():
     category = (data.get("category") or "").strip()
     context = (data.get("context") or "").strip()
     source_email = data.get("source_email") or None
+    recipient = data.get("recipient") or None
+    reply_direction = data.get("reply_direction") or None
 
     if not context:
         return jsonify({"error": "Please describe the context for this email."}), 400
@@ -94,7 +96,11 @@ def api_generate():
             return jsonify({"error": f"Unknown category '{category}'."}), 400
 
     try:
-        drafts, backend = llm_client.generate_drafts(template, context, source_email=source_email, n=3)
+        drafts, backend = llm_client.generate_drafts(
+            template, context,
+            source_email=source_email, n=3,
+            recipient=recipient, reply_direction=reply_direction,
+        )
     except llm_client.LLMError as e:
         return jsonify({"error": f"Could not generate drafts: {e}"}), 502
 

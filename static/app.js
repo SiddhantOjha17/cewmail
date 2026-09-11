@@ -2,7 +2,7 @@
   "use strict";
 
   const state = {
-    reply: null, // { uid, message_id, references, body }
+    reply: null, // { uid, message_id, references, body, counterpart, sent }
     drafts: [],
   };
 
@@ -127,6 +127,8 @@
           category,
           context,
           source_email: state.reply ? state.reply.body : null,
+          recipient: state.reply ? state.reply.counterpart : null,
+          reply_direction: state.reply ? (state.reply.sent ? "sent" : "received") : null,
         }),
       });
       const data = await res.json();
@@ -416,15 +418,18 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not load message.");
 
+      // For a message you sent, reply to its recipient (To) rather than yourself (From).
+      const counterpart = data.sent ? data.to : data.from;
+
       state.reply = {
         uid: data.uid,
         message_id: data.message_id,
         references: data.references,
         body: data.body,
+        counterpart: counterpart,
+        sent: data.sent,
       };
 
-      // For a message you sent, reply to its recipient (To) rather than yourself (From).
-      const counterpart = data.sent ? data.to : data.from;
       const match = counterpart.match(/<([^>]+)>/);
       const recipientAddr = match ? match[1] : counterpart;
 
